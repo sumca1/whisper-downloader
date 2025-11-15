@@ -1,0 +1,56 @@
+name: Chunk Whisper Model and Commit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Download faster-whisper-small files
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -e
+          pip install requests
+          python scripts/download_faster_whisper.py
+
+      - name: Split model.bin into parts
+        run: |
+          cd model_tmp
+          ls -lh
+          split -b 48M model.bin model.bin.part.
+          ls -lh model.bin.part.*
+
+      - name: Move files into repository folder
+        run: |
+          mkdir -p whisper_model/chunks
+          cp model_tmp/config.json whisper_model/
+          cp model_tmp/tokenizer.json whisper_model/
+          cp model_tmp/vocabulary.txt whisper_model/
+          cp model_tmp/model.bin.part.* whisper_model/chunks/
+
+      - name: Add assembly script
+        run: echo "Assembly script already present in repository"
+
+      - name: Create README for chunked model
+        run: echo "README already present in repository"
+
+      - name: Git commit and push chunked model
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add whisper_model
+          git diff --cached --quiet && echo "No changes to commit" || git commit -m "Add chunked faster-whisper-small model and assembly script"
+          git push
